@@ -6,9 +6,15 @@ A single page desk reference for decoding Volkswagen, Audi, Skoda, SEAT and CUPR
 
 ## What it does
 
-Type anything into the filter box at the top and every table on the page filters at once. `615` gives you brakes. `black` gives you every black finish code. `Caddy` gives you the type codes. Press `/` from anywhere to jump into the box, `Esc` to clear it.
+One box, two jobs.
 
-The part number breakdown at the top is clickable. Tap any block and it takes you to the table that explains it.
+**Paste a part number and it decodes it.** `1K0615301AA GRU` comes back as a Golf Mk5 era brake part, left hand side, primed and needing paint. It handles spaced or unspaced numbers, revision letters, finish codes run onto the end without a space, and the N, WHT, G, B and D hardware prefixes. It flags exchange units, kits, major assemblies, and the left and right trap on right hand drive cars.
+
+**Paste a 17 character VIN and it decodes that instead.** Maker, model, model year letter, plant and serial.
+
+**Type anything else and it filters every table at once.** `615` gives you brakes, `black` gives you every black finish code, `Caddy` gives you the type codes. Press `/` from anywhere to jump into the box, `Esc` to clear it.
+
+Every block in a breakdown is a link to the table that explains it.
 
 ## What is in it
 

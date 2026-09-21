@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="A filterable desk reference for decoding Volkswagen, Audi, Skoda, SEAT and CUPRA part numbers and VINs.">
+<meta name="description" content="Paste a VW, Audi, Skoda, SEAT or CUPRA part number or VIN and get it broken down, plus a filterable desk reference.">
 <meta name="theme-color" content="#EDEFF1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121519" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#128295;</text></svg>">
@@ -216,6 +216,38 @@ td.code{width:1%}
   .spec dt{border-bottom:0;padding-bottom:2px;background:transparent}
 }
 
+/* decoder result */
+#decode{margin-top:18px}
+#decode h2 .n{color:var(--muted)}
+.dcard{
+  background:var(--surface);border:1px solid var(--accent);border-radius:4px;
+  box-shadow:var(--shadow);overflow:hidden
+}
+.dcard .top{
+  padding:16px 14px 18px;overflow-x:auto;border-bottom:1px solid var(--rule)
+}
+.dcard .parsed{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.08em;
+  color:var(--muted);text-transform:uppercase;margin:0 0 12px;text-align:center
+}
+.dnotes{margin:0;padding:0;list-style:none}
+.dnotes li{
+  padding:9px 14px;border-bottom:1px solid var(--rule);font-size:14px;
+  display:flex;gap:10px;align-items:baseline
+}
+.dnotes li:last-child{border-bottom:0}
+.dnotes .k{
+  flex:0 0 auto;font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  min-width:9ch
+}
+.dnotes li.warn{background:var(--warn-soft)}
+.dnotes li.warn .k{color:var(--warn)}
+.dnotes b.mono{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--accent)}
+.dfail{
+  background:var(--surface);border:1px solid var(--rule-strong);border-radius:4px;
+  padding:14px;font-size:14px;color:var(--muted)
+}
 .note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
 .empty{display:none;color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
 .is-hidden{display:none!important}
@@ -233,13 +265,18 @@ footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);font-si
 
   <div class="filterbar">
     <div class="row">
-      <input id="q" type="search" placeholder="615, brakes, Golf Mk5, black&hellip;" autocomplete="off" aria-label="Filter all tables">
+      <input id="q" type="search" placeholder="Paste a part number or VIN, or search 615, black&hellip;" autocomplete="off" spellcheck="false" aria-label="Decode a part number or VIN, or filter the tables">
       <button id="clear" type="button">Clear</button>
     </div>
     <div id="count"></div>
   </div>
 
   <p class="empty" id="empty">Nothing matches that.</p>
+
+  <section id="decode" hidden>
+    <h2>Decoded <span class="n" id="dkind"></span></h2>
+    <div id="dbody"></div>
+  </section>
 
   <section id="anatomy">
     <h2>Anatomy <span class="n">1K0 615 301 AA GRU</span></h2>
@@ -587,27 +624,271 @@ footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);font-si
 
 <script>
 (function(){
-  var q = document.getElementById('q');
-  var clear = document.getElementById('clear');
-  var count = document.getElementById('count');
-  var empty = document.getElementById('empty');
+  'use strict';
+
+  var q       = document.getElementById('q');
+  var clear   = document.getElementById('clear');
+  var count   = document.getElementById('count');
+  var empty   = document.getElementById('empty');
+  var decode  = document.getElementById('decode');
+  var dkind   = document.getElementById('dkind');
+  var dbody   = document.getElementById('dbody');
+  var anatomy = document.getElementById('anatomy');
+
   var sections = Array.prototype.slice.call(document.querySelectorAll('section'));
   var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr[data-s]'));
-
   rows.forEach(function(r){
     r.dataset.hay = (r.dataset.s + ' ' + r.textContent).toLowerCase().replace(/\s+/g,' ');
   });
 
+  /* ---------- lookups, read straight off the tables so new rows work automatically ---------- */
+
+  function pairsFrom(tables){
+    var out = {};
+    Array.prototype.forEach.call(tables, function(tab){
+      tab.querySelectorAll('tbody tr').forEach(function(tr){
+        var td = tr.querySelectorAll('td');
+        if(td.length < 2) return;
+        var meaning = td[1].textContent.trim();
+        if(!meaning) return;
+        td[0].textContent.split('/').forEach(function(code){
+          code = code.trim().toUpperCase();
+          if(code) out[code] = meaning;
+        });
+      });
+    });
+    return out;
+  }
+  function sel(s){ return document.querySelectorAll(s); }
+
+  var vinTables = sel('#vin .tbox table');
+  var GROUP  = pairsFrom(sel('#main-groups table'));
+  var SUB    = pairsFrom(sel('#subgroups table'));
+  var BODY   = pairsFrom(sel('#bodyshape table'));
+  var TYPE   = pairsFrom(sel('#typecodes table'));
+  var FINISH = pairsFrom(sel('#finish table'));
+  var WMI    = vinTables.length ? pairsFrom([vinTables[0]]) : {};
+
+  var YEAR = {};
+  if(vinTables.length > 1){
+    vinTables[1].querySelectorAll('tbody tr').forEach(function(tr){
+      var td = tr.querySelectorAll('td');
+      for(var i = 0; i + 1 < td.length; i += 2){
+        var l = td[i].textContent.trim().toUpperCase();
+        var y = td[i+1].textContent.trim();
+        if(l && y) YEAR[l] = y;
+      }
+    });
+  }
+
+  var PLANT = {
+    A:'Ingolstadt', B:'Brussels', C:'Chattanooga', D:'Bratislava', E:'Emden',
+    H:'Hannover', K:'Osnabruck', M:'Puebla', N:'Neckarsulm', P:'Mosel',
+    S:'Salzgitter', W:'Wolfsburg', X:'Poznan', Z:'Zwickau'
+  };
+
+  var PREFIX = {
+    N:'Fastener. Bolt, nut, clip, clamp or seal. Often single use',
+    WHT:'Fastener, newer generation. Bolt, nut or clip',
+    G:'Lubricant or coolant',
+    B:'Brake fluid or paste',
+    D:'Sealant or adhesive'
+  };
+
+  /* ---------- helpers ---------- */
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function seg(value, label, meaning, href){
+    var inner = '<b>' + esc(value) + '</b><i>' + esc(label) +
+                (meaning ? '<br>' + esc(meaning) : '') + '</i>';
+    return href ? '<a class="seg" href="' + href + '">' + inner + '</a>'
+                : '<span class="seg">' + inner + '</span>';
+  }
+  function note(k, html, warn){
+    return '<li' + (warn ? ' class="warn"' : '') + '><span class="k">' + esc(k) +
+           '</span><span>' + html + '</span></li>';
+  }
+  function mono(s){ return '<b class="mono">' + esc(s) + '</b>'; }
+
+  /* ---------- part number ---------- */
+
+  function decodePart(clean){
+    var pre = clean.match(/^(WHT|N|G|B|D)(\d{5,})$/);
+    if(pre && PREFIX[pre[1]]){
+      return {
+        kind: 'letter prefixed part',
+        pretty: pre[1] + ' ' + pre[2],
+        segs: seg(pre[1], 'Prefix', '', '#letters') + seg(pre[2], 'Serial'),
+        notes: note('What', esc(PREFIX[pre[1]])) +
+               note('Tip', 'Low value, high annoyance. Worth offering with the main part rather than letting the customer find out later.')
+      };
+    }
+
+    var m = clean.match(/^([0-9A-Z]{3})(\d{6})([A-Z0-9]*)$/);
+    if(!m) return null;
+
+    var type = m[1], digits = m[2], rest = m[3];
+    var model = type.slice(0,2), bodyDigit = type.charAt(2);
+    var groupDigit = digits.charAt(0);
+    var subCode = digits.slice(0,3);
+    var partNo = digits.slice(3,6);
+
+    var index = '', finish = '';
+    if(rest){
+      if(rest.length > 3){
+        var tail = rest.slice(-3);
+        if(FINISH[tail] || /\d/.test(tail)){ finish = tail; index = rest.slice(0,-3); }
+        else index = rest;
+      } else if(/^[A-Z]+$/.test(rest)){
+        if(rest.length === 3 && FINISH[rest]) finish = rest; else index = rest;
+      } else {
+        finish = rest;
+      }
+    }
+
+    var typeMeaning = TYPE[type], typeNote = '';
+    if(!typeMeaning){
+      var hit = Object.keys(TYPE).filter(function(k){ return k.slice(0,2) === model; })[0];
+      if(hit){
+        typeMeaning = TYPE[hit];
+        typeNote = 'No exact entry for ' + type + '. Matched on ' + model +
+                   ', so same model, different body or hand of drive.';
+      }
+    }
+
+    var pretty = type + ' ' + digits.slice(0,3) + ' ' + digits.slice(3,6) +
+                 (index ? ' ' + index : '') + (finish ? ' ' + finish : '');
+
+    var segs = seg(model, 'Model', typeMeaning ? typeMeaning.split(',')[0] : 'Not listed', '#typecodes') +
+               seg(bodyDigit, 'Body shape', BODY[bodyDigit] || 'Not listed', '#bodyshape') +
+               seg(groupDigit, 'Main group', GROUP[groupDigit] || 'Not listed', '#main-groups') +
+               seg(digits.slice(1,3), 'Subgroup', SUB[subCode] ? SUB[subCode].split(',')[0] : 'Not listed', '#subgroups') +
+               seg(partNo, 'Part', '', '#traps') +
+               (index  ? seg(index,  'Revision', '', '#letters') : '') +
+               (finish ? seg(finish, 'Finish', FINISH[finish] ? FINISH[finish].split('.')[0] : 'Not listed', '#finish') : '');
+
+    var n = '';
+    n += note('Model', typeMeaning ? mono(type) + ' ' + esc(typeMeaning)
+                                   : mono(type) + ' is not in the type code table');
+    if(typeNote) n += note('Careful', esc(typeNote), true);
+    n += note('System', mono(subCode) + ' ' + esc(SUB[subCode] || 'not in the subgroup table') +
+                        ', inside ' + esc(GROUP[groupDigit] || 'an unlisted group'));
+
+    var last = partNo.charAt(2);
+    if(/\d/.test(last)){
+      var side = (parseInt(last,10) % 2) ? 'left' : 'right';
+      var uk = (side === 'left') ? 'passenger side' : 'driver side';
+      n += note('Side', 'Last digit ' + mono(last) + ' is <b>' + side +
+                        '</b>, which on a UK right hand drive car is the <b>' + uk +
+                        '</b>. Only meaningful on a handed part.');
+    }
+    if(partNo.charAt(0) === '0'){
+      n += note('Assembly', 'Starts with a zero, so usually a major assembly rather than a single component.');
+    }
+    if(subCode.slice(1) === '98'){
+      n += note('Kit', 'Subgroup ends 98, so this is a kit or a set, not one part.', true);
+    }
+    if(index){
+      n += note('Revision', 'Index ' + mono(index) +
+                            '. A later letter usually supersedes an earlier one, but not always, and a revision can change fitment.');
+    }
+    if(/X$/.test(index)){
+      n += note('Exchange', 'Ends in X, so this is an exchange or remanufactured unit. It carries a surcharge refunded when the old one comes back. Say so before they order.', true);
+    }
+    if(finish){
+      n += note('Finish', mono(finish) + ' ' + esc(FINISH[finish] || 'not in the finish table') +
+                          '. Same base number in another finish is a separate product with its own SKU.');
+      if(finish === 'GRU'){
+        n += note('Warning', 'Primed. It arrives grey and needs painting. Make that unmissable in the listing.', true);
+      }
+    }
+    n += note('Reminder', 'The type code says where this part started life, not what it fits. Confirm fitment against the VIN in the catalogue.', true);
+
+    return { kind:'part number', pretty:pretty, segs:segs, notes:n };
+  }
+
+  /* ---------- VIN ---------- */
+
+  function decodeVin(clean){
+    if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(clean)) return null;
+    var wmi = clean.slice(0,3), fill = clean.slice(3,6), model = clean.slice(6,8);
+    var chk = clean.charAt(8), yr = clean.charAt(9), plant = clean.charAt(10);
+    var serial = clean.slice(11);
+
+    var marque = WMI[wmi] || '';
+    var modelHit = Object.keys(TYPE).filter(function(k){ return k.slice(0,2) === model; })[0];
+    var modelName = modelHit ? TYPE[modelHit] : '';
+
+    var segs = seg(wmi, 'Maker', marque || 'Not listed', '#vin-maker') +
+               seg(fill, 'Filler') +
+               seg(model, 'Model', modelName ? modelName.split(',')[0] : 'Not listed', '#typecodes') +
+               seg(chk, 'Check') +
+               seg(yr, 'Year', YEAR[yr] || 'Not listed', '#vin-year') +
+               seg(plant, 'Plant', PLANT[plant] || 'Not listed') +
+               seg(serial, 'Serial');
+
+    var n = '';
+    n += note('Maker', mono(wmi) + ' ' + esc(marque || 'not in the maker table'));
+    n += note('Model', mono(model) + ' ' + esc(modelName || 'no matching type code in this table'));
+    n += note('Year', YEAR[yr] ? 'Model year <b>' + esc(YEAR[yr]) + '</b>, from the letter ' + mono(yr)
+                               : mono(yr) + ' is not in the model year table');
+    n += note('Plant', PLANT[plant] ? esc(PLANT[plant]) : mono(plant) + ' is not in this table');
+    n += note('Careful', 'Model year is not plate year. A 69 plate car is often a 2020 model year car, and parts break on model year.', true);
+    n += note('Next', 'The VIN does not carry interior trim colour. For that you need the PR codes on the vehicle data sticker, in the boot or the service book.');
+
+    return { kind:'VIN', pretty:wmi + ' ' + fill + ' ' + model + ' ' + chk + ' ' + yr + ' ' + plant + ' ' + serial, segs:segs, notes:n };
+  }
+
+  /* ---------- render ---------- */
+
+  function showDecode(res){
+    dkind.textContent = res.kind;
+    dbody.innerHTML =
+      '<div class="dcard">' +
+        '<div class="top">' +
+          '<p class="parsed">' + esc(res.pretty) + '</p>' +
+          '<div class="seg-row">' + res.segs + '</div>' +
+        '</div>' +
+        '<ul class="dnotes">' + res.notes + '</ul>' +
+      '</div>';
+    decode.hidden = false;
+  }
+  function showNoParse(raw){
+    dkind.textContent = 'no match';
+    dbody.innerHTML = '<p class="dfail">' + esc(raw) +
+      ' does not look like a VAG part number or a 17 character VIN, and nothing in the tables matches it either. ' +
+      'Part numbers are three characters then six digits, for example 1K0615301AA. VINs are 17 characters.</p>';
+    decode.hidden = false;
+  }
+  function resetTables(){
+    rows.forEach(function(r){ r.classList.remove('is-hidden'); });
+    sections.forEach(function(s){ s.classList.remove('is-hidden'); });
+    empty.style.display = 'none';
+  }
+
   function run(){
-    var term = q.value.trim().toLowerCase();
-    if(!term){
-      rows.forEach(function(r){ r.classList.remove('is-hidden'); });
-      sections.forEach(function(s){ s.classList.remove('is-hidden'); });
-      empty.classList.remove('is-shown');
-      empty.style.display = 'none';
-      count.textContent = '';
+    var raw = q.value.trim();
+    decode.hidden = true;
+    anatomy.hidden = false;
+
+    if(!raw){ resetTables(); count.textContent = ''; return; }
+
+    var clean = raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
+    var res = decodeVin(clean) || decodePart(clean);
+
+    if(res){
+      showDecode(res);
+      anatomy.hidden = true;
+      resetTables();
+      count.textContent = 'decoded as a ' + res.kind;
       return;
     }
+
+    var term = raw.toLowerCase();
     var hits = 0;
     rows.forEach(function(r){
       var on = r.dataset.hay.indexOf(term) !== -1;
@@ -620,6 +901,14 @@ footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);font-si
       var any = Array.prototype.some.call(tr, function(r){ return !r.classList.contains('is-hidden'); });
       s.classList.toggle('is-hidden', !any);
     });
+
+    if(!hits && clean.length >= 6){
+      showNoParse(raw);
+      anatomy.hidden = true;
+      empty.style.display = 'none';
+      count.textContent = '';
+      return;
+    }
     empty.style.display = hits ? 'none' : 'block';
     count.textContent = hits + (hits === 1 ? ' match' : ' matches');
   }
@@ -628,7 +917,7 @@ footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);font-si
   clear.addEventListener('click', function(){ q.value = ''; run(); q.focus(); });
   document.addEventListener('keydown', function(e){
     if(e.key === '/' && document.activeElement !== q){ e.preventDefault(); q.focus(); q.select(); }
-    if(e.key === 'Escape' && document.activeElement === q){ q.value=''; run(); }
+    if(e.key === 'Escape' && document.activeElement === q){ q.value = ''; run(); }
   });
 })();
 </script>
