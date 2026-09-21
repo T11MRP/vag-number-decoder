@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A filterable desk reference for decoding Volkswagen, Audi, Skoda, SEAT and CUPRA part numbers and VINs.">
+<meta name="theme-color" content="#EDEFF1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121519" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#128295;</text></svg>">
+<style>
+  html{color-scheme:light dark}
+  :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>VAG Number Decoder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<style>
+:root{
+  --ground:#EDEFF1;
+  --surface:#FFFFFF;
+  --surface-2:#F5F7F8;
+  --ink:#171C22;
+  --muted:#5D6874;
+  --rule:#D2D8DE;
+  --rule-strong:#B4BDC6;
+  --accent:#1F4E8C;
+  --accent-soft:#E2EAF4;
+  --warn:#8F4A0B;
+  --warn-soft:#F6E9DA;
+  --shadow:0 1px 2px rgba(23,28,34,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#121519;
+    --surface:#1A1F25;
+    --surface-2:#20262D;
+    --ink:#E4E8EC;
+    --muted:#96A0AB;
+    --rule:#2B333B;
+    --rule-strong:#3C4650;
+    --accent:#77ACE8;
+    --accent-soft:#1B2A3C;
+    --warn:#E09A4E;
+    --warn-soft:#2E2314;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#121519;
+  --surface:#1A1F25;
+  --surface-2:#20262D;
+  --ink:#E4E8EC;
+  --muted:#96A0AB;
+  --rule:#2B333B;
+  --rule-strong:#3C4650;
+  --accent:#77ACE8;
+  --accent-soft:#1B2A3C;
+  --warn:#E09A4E;
+  --warn-soft:#2E2314;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  margin:0;
+}
+.wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+
+/* header */
+.masthead{padding-block:28px 18px;border-bottom:1px solid var(--rule-strong)}
+.eyebrow{
+  font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 6px
+}
+h1{
+  font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-weight:700;font-size:clamp(28px,6vw,40px);line-height:1.05;
+  margin:0 0 8px;text-wrap:balance;letter-spacing:-.01em
+}
+.sub{color:var(--muted);margin:0;max-width:60ch;font-size:14px}
+
+/* filter */
+.filterbar{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+  background:var(--ground);
+  padding-block:10px;
+  border-bottom:1px solid var(--rule);
+  margin-bottom:8px;
+}
+.filterbar .row{display:flex;gap:8px;align-items:center}
+#q{
+  flex:1;min-width:0;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:15px;
+  padding:10px 12px;border:1px solid var(--rule-strong);border-radius:3px;
+  background:var(--surface);color:var(--ink);
+}
+#q:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+#clear{
+  font:inherit;font-size:13px;padding:10px 12px;cursor:pointer;
+  background:var(--surface);color:var(--muted);
+  border:1px solid var(--rule-strong);border-radius:3px;
+}
+#clear:hover{color:var(--ink);border-color:var(--rule-strong)}
+#count{font-size:12px;color:var(--muted);padding-top:6px;min-height:18px;font-variant-numeric:tabular-nums}
+
+/* sections */
+section{margin-top:34px;scroll-margin-top:96px}
+h3{scroll-margin-top:96px}
+h2{
+  font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+  margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid var(--rule-strong);
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px
+}
+h2 .n{color:var(--accent);font-size:12px}
+h3{
+  font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-weight:600;font-size:14px;letter-spacing:.04em;
+  margin:18px 0 8px;color:var(--muted);text-transform:uppercase
+}
+
+/* anatomy */
+.anatomy{
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  padding:18px 14px;box-shadow:var(--shadow);
+  overflow-x:auto;
+}
+.seg-row{display:flex;gap:6px;min-width:min-content;justify-content:center}
+.seg{flex:0 0 auto;text-align:center;display:block;text-decoration:none;color:inherit}
+.seg b{
+  display:block;font-family:"IBM Plex Mono",monospace;font-weight:600;
+  font-size:clamp(18px,4.6vw,26px);letter-spacing:.06em;
+  background:var(--surface-2);border:1px solid var(--rule);border-radius:3px;
+  padding:8px 10px;white-space:nowrap
+}
+.seg i{
+  display:block;font-style:normal;font-size:10px;line-height:1.35;color:var(--muted);
+  margin-top:7px;max-width:13ch;margin-inline:auto;
+  font-family:"IBM Plex Sans Condensed",sans-serif;letter-spacing:.05em;text-transform:uppercase
+}
+a.seg{cursor:pointer}
+a.seg b{position:relative}
+a.seg b::after{
+  content:"";position:absolute;left:8px;right:8px;bottom:3px;height:2px;
+  background:var(--rule-strong);border-radius:2px
+}
+a.seg:hover b,a.seg:focus-visible b{
+  background:var(--accent-soft);border-color:var(--accent);color:var(--accent)
+}
+a.seg:hover b::after,a.seg:focus-visible b::after{background:var(--accent)}
+a.seg:hover i,a.seg:focus-visible i{color:var(--accent)}
+a.seg:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+a.seg:active b{transform:translateY(1px)}
+@media (prefers-reduced-motion:no-preference){
+  a.seg b{transition:background .12s,border-color .12s,color .12s}
+  html{scroll-behavior:smooth}
+}
+/* landed-on section */
+section:target h2{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* tables */
+.tbox{overflow-x:auto;border:1px solid var(--rule);border-radius:4px;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{
+  text-align:left;font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  padding:9px 12px;border-bottom:1px solid var(--rule-strong);background:var(--surface-2);
+  position:sticky;top:0
+}
+td{padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:500;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--accent)
+}
+td.code{width:1%}
+.grp{display:flex;flex-wrap:wrap;gap:4px 10px}
+.grp span{white-space:nowrap}
+.grp b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--accent);font-size:13px}
+
+/* traps */
+.trap{
+  background:var(--warn-soft);border:1px solid var(--warn);border-left-width:3px;
+  border-radius:3px;padding:12px 14px;margin-bottom:10px
+}
+.trap p{margin:0}
+.trap p+p{margin-top:6px}
+.trap strong{
+  font-family:"IBM Plex Sans Condensed",sans-serif;letter-spacing:.06em;
+  text-transform:uppercase;font-size:12px;color:var(--warn);display:block;margin-bottom:4px
+}
+
+/* listing */
+.spec{background:var(--surface);border:1px solid var(--rule);border-radius:4px;box-shadow:var(--shadow);overflow:hidden}
+.spec dl{margin:0;display:grid;grid-template-columns:auto 1fr}
+.spec dt{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  padding:9px 12px;border-bottom:1px solid var(--rule);background:var(--surface-2);white-space:nowrap
+}
+.spec dd{
+  margin:0;padding:9px 12px;border-bottom:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:13px;overflow-wrap:anywhere
+}
+.spec dl>:nth-last-child(-n+2){border-bottom:0}
+@media (max-width:460px){
+  .spec dl{grid-template-columns:1fr}
+  .spec dt{border-bottom:0;padding-bottom:2px;background:transparent}
+}
+
+.note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.empty{display:none;color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
+.is-hidden{display:none!important}
+footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.hitrow{transition:background .15s}}
+</style></head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Partshaus desk card</p>
+    <h1>VAG Number Decoder</h1>
+    <p class="sub">Volkswagen, Audi, Skoda, SEAT and CUPRA part numbers, stripped to what you need at the counter. Type anything into the box to filter every table at once.</p>
+  </header>
+
+  <div class="filterbar">
+    <div class="row">
+      <input id="q" type="search" placeholder="615, brakes, Golf Mk5, black&hellip;" autocomplete="off" aria-label="Filter all tables">
+      <button id="clear" type="button">Clear</button>
+    </div>
+    <div id="count"></div>
+  </div>
+
+  <p class="empty" id="empty">Nothing matches that.</p>
+
+  <section id="anatomy">
+    <h2>Anatomy <span class="n">1K0 615 301 AA GRU</span></h2>
+    <div class="anatomy">
+      <div class="seg-row">
+        <a class="seg" href="#typecodes"><b>1K</b><i>Model<br>Golf Mk5</i></a>
+        <a class="seg" href="#bodyshape"><b>0</b><i>Body shape<br>All</i></a>
+        <a class="seg" href="#main-groups"><b>6</b><i>Main group<br>Brakes</i></a>
+        <a class="seg" href="#subgroups"><b>15</b><i>Subgroup<br>Discs</i></a>
+        <a class="seg" href="#traps"><b>301</b><i>Part<br>Odd = left</i></a>
+        <a class="seg" href="#letters"><b>AA</b><i>Revision</i></a>
+        <a class="seg" href="#finish"><b>GRU</b><i>Finish<br>Primed</i></a>
+      </div>
+    </div>
+    <p class="note">Nine base characters, then revision letters, then an optional finish code after a space. Subgroup is read as the three digits together, 615, but the first of them is the main group. Tap any block to jump to its table.</p>
+  </section>
+
+  <section id="main-groups">
+    <h2>Main group <span class="n">character 4</span></h2>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Digit</th><th>System</th></tr></thead>
+        <tbody>
+          <tr data-s="1 engine motor"><td class="code">1</td><td>Engine</td></tr>
+          <tr data-s="2 fuel exhaust cooling tank"><td class="code">2</td><td>Fuel, exhaust, cooling</td></tr>
+          <tr data-s="3 gearbox transmission clutch dsg"><td class="code">3</td><td>Gearbox and transmission</td></tr>
+          <tr data-s="4 front axle differential steering driveshaft wishbone"><td class="code">4</td><td>Front axle, differential, steering</td></tr>
+          <tr data-s="5 rear axle suspension"><td class="code">5</td><td>Rear axle</td></tr>
+          <tr data-s="6 wheels brakes discs pads abs"><td class="code">6</td><td>Wheels and brakes</td></tr>
+          <tr data-s="7 pedals levers handbrake gear lever controls"><td class="code">7</td><td>Hand and foot controls, pedals</td></tr>
+          <tr data-s="8 body panels interior trim seats doors bumper"><td class="code">8</td><td>Body panels and interior trim</td></tr>
+          <tr data-s="9 electrical lights wiring sensors ecu"><td class="code">9</td><td>Electrical</td></tr>
+          <tr data-s="0 accessories general universal"><td class="code">0</td><td>Accessories and general</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="subgroups">
+    <h2>Subgroup <span class="n">characters 4 to 6</span></h2>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr data-s="100 engine assembly long block"><td class="code">100</td><td>Engine assembly</td></tr>
+          <tr data-s="103 cylinder block"><td class="code">103</td><td>Cylinder block</td></tr>
+          <tr data-s="105 crankshaft pistons conrods"><td class="code">105</td><td>Crank, pistons, conrods</td></tr>
+          <tr data-s="109 timing belt chain cam"><td class="code">109</td><td>Timing belt and chain</td></tr>
+          <tr data-s="115 oil pump sump"><td class="code">115</td><td>Oil pump</td></tr>
+          <tr data-s="117 oil cooler filter housing"><td class="code">117</td><td>Oil cooler and filter</td></tr>
+          <tr data-s="119 aux belt drive tensioner pulley"><td class="code">119</td><td>Ancillary belt drive</td></tr>
+          <tr data-s="121 radiator water pump hoses coolant"><td class="code">121</td><td>Radiator, water pump, hoses</td></tr>
+          <tr data-s="129 air filter intake airbox"><td class="code">129</td><td>Air filter and intake</td></tr>
+          <tr data-s="145 turbo turbocharger charge air intercooler"><td class="code">145</td><td>Turbo and charge air</td></tr>
+          <tr data-s="199 engine mounts"><td class="code">199</td><td>Engine mounts</td></tr>
+          <tr data-s="201 fuel tank lines pump"><td class="code">201</td><td>Fuel tank and lines</td></tr>
+          <tr data-s="253 exhaust downpipe dpf backbox"><td class="code">253</td><td>Exhaust</td></tr>
+          <tr data-s="300 gearbox transmission"><td class="code">300</td><td>Gearbox</td></tr>
+          <tr data-s="311 clutch flywheel"><td class="code">311</td><td>Clutch</td></tr>
+          <tr data-s="321 gearbox housing casing"><td class="code">321</td><td>Gearbox housing</td></tr>
+          <tr data-s="407 wishbone driveshaft front hub control arm"><td class="code">407</td><td>Wishbones and driveshafts</td></tr>
+          <tr data-s="411 front springs anti roll bar arb"><td class="code">411</td><td>Front springs and anti roll bar</td></tr>
+          <tr data-s="412 front struts shock absorber damper"><td class="code">412</td><td>Front struts</td></tr>
+          <tr data-s="419 steering wheel column airbag"><td class="code">419</td><td>Steering wheel and column</td></tr>
+          <tr data-s="422 steering rack pump"><td class="code">422</td><td>Steering rack</td></tr>
+          <tr data-s="501 rear axle beam"><td class="code">501</td><td>Rear axle</td></tr>
+          <tr data-s="505 rear suspension arms"><td class="code">505</td><td>Rear suspension</td></tr>
+          <tr data-s="511 rear springs"><td class="code">511</td><td>Rear springs</td></tr>
+          <tr data-s="513 rear shocks dampers"><td class="code">513</td><td>Rear shocks</td></tr>
+          <tr data-s="601 wheels alloys rims"><td class="code">601</td><td>Wheels</td></tr>
+          <tr data-s="611 master cylinder servo brake"><td class="code">611</td><td>Master cylinder and servo</td></tr>
+          <tr data-s="614 abs pump module esp"><td class="code">614</td><td>ABS</td></tr>
+          <tr data-s="615 brake discs calipers rotors"><td class="code">615</td><td>Brake discs and calipers</td></tr>
+          <tr data-s="698 brake pads repair kit set"><td class="code">698</td><td>Brake pad and repair kits</td></tr>
+          <tr data-s="807 bumper front rear"><td class="code">807</td><td>Bumpers</td></tr>
+          <tr data-s="819 heater matrix ventilation blower"><td class="code">819</td><td>Heating and ventilation</td></tr>
+          <tr data-s="820 air conditioning aircon condenser compressor"><td class="code">820</td><td>Air conditioning</td></tr>
+          <tr data-s="821 wing fender arch"><td class="code">821</td><td>Wings</td></tr>
+          <tr data-s="823 bonnet hood release"><td class="code">823</td><td>Bonnet</td></tr>
+          <tr data-s="827 tailgate bootlid"><td class="code">827</td><td>Tailgate and bootlid</td></tr>
+          <tr data-s="831 front doors"><td class="code">831</td><td>Front doors</td></tr>
+          <tr data-s="833 rear doors"><td class="code">833</td><td>Rear doors</td></tr>
+          <tr data-s="837 front door handles locks"><td class="code">837</td><td>Front door handles and locks</td></tr>
+          <tr data-s="845 glass windscreen window"><td class="code">845</td><td>Glass</td></tr>
+          <tr data-s="853 grille badge exterior trim emblem"><td class="code">853</td><td>Grilles, badges, exterior trim</td></tr>
+          <tr data-s="857 dashboard interior trim sun visor grab handle glovebox"><td class="code">857</td><td>Dashboard, interior trim, sun visors, grab handles</td></tr>
+          <tr data-s="858 pillar trim column shroud a-pillar grab handle"><td class="code">858</td><td>Pillar trim and column shrouds</td></tr>
+          <tr data-s="863 carpet boot trim floor"><td class="code">863</td><td>Carpets and boot trim</td></tr>
+          <tr data-s="867 door cards panels"><td class="code">867</td><td>Door cards</td></tr>
+          <tr data-s="881 front seats"><td class="code">881</td><td>Front seats</td></tr>
+          <tr data-s="883 rear seats bench"><td class="code">883</td><td>Rear seats</td></tr>
+          <tr data-s="903 alternator"><td class="code">903</td><td>Alternator</td></tr>
+          <tr data-s="905 ignition coil pack switch"><td class="code">905</td><td>Ignition and coils</td></tr>
+          <tr data-s="911 starter motor"><td class="code">911</td><td>Starter motor</td></tr>
+          <tr data-s="915 battery"><td class="code">915</td><td>Battery</td></tr>
+          <tr data-s="919 sensors gauges navigation parking"><td class="code">919</td><td>Sensors, gauges, navigation</td></tr>
+          <tr data-s="920 instrument cluster dials speedo"><td class="code">920</td><td>Instrument cluster</td></tr>
+          <tr data-s="927 control units modules"><td class="code">927</td><td>Control units</td></tr>
+          <tr data-s="937 fuse box wiring relay"><td class="code">937</td><td>Fuse box and wiring</td></tr>
+          <tr data-s="941 headlights headlamp"><td class="code">941</td><td>Headlights</td></tr>
+          <tr data-s="945 rear lights tail lamp"><td class="code">945</td><td>Rear lights</td></tr>
+          <tr data-s="953 column switches stalks"><td class="code">953</td><td>Column switches and stalks</td></tr>
+          <tr data-s="955 wipers washers linkage motor"><td class="code">955</td><td>Wipers and washers</td></tr>
+          <tr data-s="959 window mirror central locking motors switches"><td class="code">959</td><td>Window, mirror and locking motors</td></tr>
+          <tr data-s="971 973 wiring loom connectors plugs"><td class="code">971 / 973</td><td>Looms and connectors</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="trap" style="margin-top:12px">
+      <p><strong>Ends in 98</strong></p>
+      <p>Any subgroup ending 98 is a kit or a set, not a single part. 198 engine gasket set, 498 CV joint kit, 698 brake pads, 898 body repair kit.</p>
+    </div>
+  </section>
+
+  <section id="bodyshape">
+    <h2>Body shape <span class="n">character 3</span></h2>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Digit</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr data-s="0 general all versions"><td class="code">0</td><td>General, all versions</td></tr>
+          <tr data-s="1 lhd left hand drive"><td class="code">1</td><td>Left hand drive</td></tr>
+          <tr data-s="2 rhd right hand drive uk"><td class="code">2</td><td>Right hand drive</td></tr>
+          <tr data-s="3 two door 3 door"><td class="code">3</td><td>Two door</td></tr>
+          <tr data-s="4 four door 5 door"><td class="code">4</td><td>Four door</td></tr>
+          <tr data-s="5 notchback saloon"><td class="code">5</td><td>Notchback</td></tr>
+          <tr data-s="6 hatchback"><td class="code">6</td><td>Hatchback</td></tr>
+          <tr data-s="7 special convertible cabriolet pickup"><td class="code">7</td><td>Special, convertible, pickup</td></tr>
+          <tr data-s="8 coupe"><td class="code">8</td><td>Coupe</td></tr>
+          <tr data-s="9 variant estate wagon"><td class="code">9</td><td>Variant, estate</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Not applied perfectly consistently, but on a UK desk always glance at it. A 1 where you want a 2 is a return.</p>
+  </section>
+
+  <section id="typecodes">
+    <h2>Type codes <span class="n">characters 1 to 3</span></h2>
+
+    <h3>Volkswagen</h3>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>Vehicle</th></tr></thead>
+        <tbody>
+          <tr data-s="1h0 golf mk3"><td class="code">1H0</td><td>Golf Mk3, 1991 to 1997</td></tr>
+          <tr data-s="1j0 golf mk4 bora"><td class="code">1J0</td><td>Golf Mk4 and Bora, 1998 to 2004</td></tr>
+          <tr data-s="1k0 golf mk5 pq35"><td class="code">1K0</td><td>Golf Mk5, 2004 to 2009. Widely shared across PQ35</td></tr>
+          <tr data-s="5k0 golf mk6"><td class="code">5K0</td><td>Golf Mk6, 2009 to 2013</td></tr>
+          <tr data-s="5g0 golf mk7 mk7.5"><td class="code">5G0</td><td>Golf Mk7 and Mk7.5, 2013 to 2020</td></tr>
+          <tr data-s="5h0 golf mk8"><td class="code">5H0</td><td>Golf Mk8, 2020 on</td></tr>
+          <tr data-s="5q0 mqb shared platform common"><td class="code">5Q0</td><td>MQB shared, Golf Mk7 era across all four brands</td></tr>
+          <tr data-s="5wa mqb evo shared golf 8"><td class="code">5WA</td><td>MQB Evo shared, Golf Mk8 era</td></tr>
+          <tr data-s="3b0 passat b5"><td class="code">3B0</td><td>Passat B5</td></tr>
+          <tr data-s="3c0 passat b6"><td class="code">3C0</td><td>Passat B6, 2005 to 2010</td></tr>
+          <tr data-s="3aa passat b7"><td class="code">3AA</td><td>Passat B7, 2010 to 2014</td></tr>
+          <tr data-s="3g0 passat b8"><td class="code">3G0</td><td>Passat B8, 2014 on</td></tr>
+          <tr data-s="6q0 polo 9n"><td class="code">6Q0</td><td>Polo 9N</td></tr>
+          <tr data-s="6r0 polo mk5 6c"><td class="code">6R0</td><td>Polo Mk5, 2009 to 2017</td></tr>
+          <tr data-s="2g0 polo mk6 aw"><td class="code">2G0</td><td>Polo Mk6 AW, 2017 on</td></tr>
+          <tr data-s="5n0 tiguan mk1"><td class="code">5N0</td><td>Tiguan Mk1</td></tr>
+          <tr data-s="5na tiguan mk2"><td class="code">5NA</td><td>Tiguan Mk2, 2016 on</td></tr>
+          <tr data-s="1t0 touran mk1"><td class="code">1T0</td><td>Touran Mk1</td></tr>
+          <tr data-s="2k0 caddy mk3 mk4 van"><td class="code">2K0</td><td>Caddy Mk3 and Mk4, 2004 to 2020</td></tr>
+          <tr data-s="2k7 2k8 2k9 caddy mk5"><td class="code">2K7 / 2K8 / 2K9</td><td>Caddy Mk5, 2021 on. Black interior</td></tr>
+          <tr data-s="7h0 transporter t5"><td class="code">7H0</td><td>Transporter T5, 2003 to 2009</td></tr>
+          <tr data-s="7e0 transporter t5 facelift t6"><td class="code">7E0</td><td>Transporter T5.1 and T6</td></tr>
+          <tr data-s="7l0 touareg mk1"><td class="code">7L0</td><td>Touareg Mk1</td></tr>
+          <tr data-s="7c0 crafter"><td class="code">7C0</td><td>Crafter, 2017 on</td></tr>
+          <tr data-s="1s0 up"><td class="code">1S0</td><td>Up</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Audi, Skoda, SEAT</h3>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>Vehicle</th></tr></thead>
+        <tbody>
+          <tr data-s="8l0 audi a3 mk1"><td class="code">8L0</td><td>Audi A3 Mk1</td></tr>
+          <tr data-s="8p0 audi a3 mk2"><td class="code">8P0</td><td>Audi A3 Mk2, 2003 to 2012</td></tr>
+          <tr data-s="8v0 audi a3 mk3"><td class="code">8V0</td><td>Audi A3 Mk3, 2012 to 2020</td></tr>
+          <tr data-s="8y0 audi a3 mk4"><td class="code">8Y0</td><td>Audi A3 Mk4, 2020 on</td></tr>
+          <tr data-s="8e0 audi a4 b6 b7"><td class="code">8E0</td><td>Audi A4 B6 and B7</td></tr>
+          <tr data-s="8k0 audi a4 b8"><td class="code">8K0</td><td>Audi A4 B8</td></tr>
+          <tr data-s="8w0 audi a4 b9"><td class="code">8W0</td><td>Audi A4 B9</td></tr>
+          <tr data-s="4b0 audi a6 c5"><td class="code">4B0</td><td>Audi A6 C5</td></tr>
+          <tr data-s="4f0 audi a6 c6"><td class="code">4F0</td><td>Audi A6 C6, 2004 to 2011</td></tr>
+          <tr data-s="4g0 audi a6 c7"><td class="code">4G0</td><td>Audi A6 C7</td></tr>
+          <tr data-s="4k0 audi a6 c8"><td class="code">4K0</td><td>Audi A6 C8</td></tr>
+          <tr data-s="1z0 skoda octavia mk2"><td class="code">1Z0</td><td>Skoda Octavia Mk2</td></tr>
+          <tr data-s="5e0 skoda octavia mk3"><td class="code">5E0</td><td>Skoda Octavia Mk3</td></tr>
+          <tr data-s="6j0 seat ibiza mk4"><td class="code">6J0</td><td>SEAT Ibiza Mk4</td></tr>
+          <tr data-s="5f0 seat leon mk3"><td class="code">5F0</td><td>SEAT Leon Mk3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="trap" style="margin-top:12px">
+      <p><strong>Origin, not fitment</strong></p>
+      <p>The type code says where a part started life, not what it fits. A 1K0 part covers most of PQ35: Golf Mk5 and Mk6, Golf Plus, Jetta, Touran, Caddy, Tiguan Mk1, Passat B6, Audi A3 8P, TT 8J, Octavia Mk2, Leon Mk2, Altea. Only the catalogue tells you the real fitment.</p>
+    </div>
+  </section>
+
+  <section id="letters">
+    <h2>Letters and suffixes</h2>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr data-s="a b aa ab index letter revision version supersession"><td class="code">A, B &hellip; AA</td><td>Index letters, the revision. Later usually supersedes earlier, but not always, and a revision can change fitment</td></tr>
+          <tr data-s="x exchange reman remanufactured surcharge core charge"><td class="code">X</td><td>Exchange or remanufactured. Carries a surcharge refunded when the old unit comes back. Always flag it</td></tr>
+          <tr data-s="n fastener bolt nut clip clamp"><td class="code">N</td><td>Fastener. Bolts, nuts, clips, clamps, seals. Often single use stretch bolts</td></tr>
+          <tr data-s="wht fastener newer bolt"><td class="code">WHT</td><td>Newer generation fastener, same idea as N</td></tr>
+          <tr data-s="g lubricant oil coolant grease"><td class="code">G</td><td>Lubricants and coolant</td></tr>
+          <tr data-s="b brake fluid paste"><td class="code">B</td><td>Brake fluids and pastes</td></tr>
+          <tr data-s="d sealant adhesive"><td class="code">D</td><td>Sealants and adhesives</td></tr>
+          <tr data-s="zaw zgb accessory zubehor genuine accessories"><td class="code">ZAW / ZGB</td><td>Accessories, from Zubeh&ouml;r</td></tr>
+          <tr data-s="000 universal general"><td class="code">000</td><td>Universal or general</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="finish">
+    <h2>Finish and colour <span class="n">after the space</span></h2>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>Finish</th></tr></thead>
+        <tbody>
+          <tr data-s="gru primed grundiert ready to paint bumper"><td class="code">GRU</td><td>Primed, ready to paint. Tell the customer before they buy</td></tr>
+          <tr data-s="3h8 black interior visor"><td class="code">3H8</td><td>Black, interior</td></tr>
+          <tr data-s="82v black interior"><td class="code">82V</td><td>Black, interior</td></tr>
+          <tr data-s="4pk black titan titanschwarz interior"><td class="code">4PK</td><td>Black, Titan Black, interior</td></tr>
+          <tr data-s="9b9 satin black exterior trim"><td class="code">9B9</td><td>Satin black, mostly exterior trim</td></tr>
+          <tr data-s="3fz textured satin black plastic"><td class="code">3FZ</td><td>Textured satin black plastic</td></tr>
+          <tr data-s="2f4 pearl grey interior visor"><td class="code">2F4</td><td>Pearl grey, interior</td></tr>
+          <tr data-s="y20 grey pearl interior"><td class="code">Y20</td><td>Grey, interior</td></tr>
+          <tr data-s="rm5 storm grey interior"><td class="code">RM5</td><td>Storm grey, interior</td></tr>
+          <tr data-s="3y8 pearl grey headliner fabric"><td class="code">3Y8</td><td>Pearl grey, headliner fabric</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Same base number, different suffix, different product. They get separate listings with the suffix in the SKU, never merged into variants.</p>
+  </section>
+
+  <section id="vin">
+    <h2>VIN <span class="n">17 characters</span></h2>
+    <div class="anatomy">
+      <div class="seg-row">
+        <a class="seg" href="#vin-maker"><b>WV1</b><i>Maker<br>VW vans</i></a>
+        <span class="seg"><b>ZZZ</b><i>Filler</i></span>
+        <a class="seg" href="#typecodes"><b>2K</b><i>Model<br>Caddy</i></a>
+        <span class="seg"><b>Z</b><i>Filler</i></span>
+        <a class="seg" href="#vin-year"><b>H</b><i>Year<br>2017</i></a>
+        <span class="seg"><b>X</b><i>Plant<br>Poznan</i></span>
+        <span class="seg"><b>028496</b><i>Serial</i></span>
+      </div>
+    </div>
+
+    <h3 id="vin-maker">Maker prefix</h3>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Code</th><th>Marque</th></tr></thead>
+        <tbody>
+          <tr data-s="wvw vw passenger car germany"><td class="code">WVW</td><td>VW passenger cars</td></tr>
+          <tr data-s="wv1 wv2 vw commercial van transporter caddy crafter"><td class="code">WV1 / WV2</td><td>VW commercial vehicles</td></tr>
+          <tr data-s="wau wa1 audi"><td class="code">WAU / WA1</td><td>Audi</td></tr>
+          <tr data-s="tmb skoda"><td class="code">TMB</td><td>Skoda</td></tr>
+          <tr data-s="vss seat cupra"><td class="code">VSS</td><td>SEAT and CUPRA</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="vin-year">Model year, character 10</h3>
+    <div class="tbox">
+      <table>
+        <thead><tr><th>Letter</th><th>Year</th><th>Letter</th><th>Year</th></tr></thead>
+        <tbody>
+          <tr data-s="a 2010 k 2019"><td class="code">A</td><td>2010</td><td class="code">K</td><td>2019</td></tr>
+          <tr data-s="b 2011 l 2020"><td class="code">B</td><td>2011</td><td class="code">L</td><td>2020</td></tr>
+          <tr data-s="c 2012 m 2021"><td class="code">C</td><td>2012</td><td class="code">M</td><td>2021</td></tr>
+          <tr data-s="d 2013 n 2022"><td class="code">D</td><td>2013</td><td class="code">N</td><td>2022</td></tr>
+          <tr data-s="e 2014 p 2023"><td class="code">E</td><td>2014</td><td class="code">P</td><td>2023</td></tr>
+          <tr data-s="f 2015 r 2024"><td class="code">F</td><td>2015</td><td class="code">R</td><td>2024</td></tr>
+          <tr data-s="g 2016 s 2025"><td class="code">G</td><td>2016</td><td class="code">S</td><td>2025</td></tr>
+          <tr data-s="h 2017 t 2026"><td class="code">H</td><td>2017</td><td class="code">T</td><td>2026</td></tr>
+          <tr data-s="j 2018"><td class="code">J</td><td>2018</td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">I, O, Q, U and Z are skipped. The cycle repeats every thirty years.</p>
+  </section>
+
+  <section id="traps">
+    <h2>The four that cost money</h2>
+
+    <div class="trap">
+      <p><strong>Left means passenger on a UK car</strong></p>
+      <p>Odd last digit is left, even is right, as seen from a left hand drive driver's seat. So on a British car, left is the passenger side. When a customer says "driver's side", ask which side of the car they actually mean before you pick anything.</p>
+    </div>
+
+    <div class="trap">
+      <p><strong>Model year is not plate year</strong></p>
+      <p>A car registered September 2019 on a 69 plate is often a 2020 model year car. VAG parts break on model year. Take the VIN.</p>
+    </div>
+
+    <div class="trap">
+      <p><strong>Never quote before you have a number</strong></p>
+      <p>Get the VIN, find the part, confirm stock, then tell the customer what you have. Saying "yes I've got one" before you have checked is how wrong parts get posted and how the 4.9 rating slips.</p>
+    </div>
+
+    <div class="trap">
+      <p><strong>A revision can change fitment</strong></p>
+      <p>1K0615301 and 1K0615301AA are not automatically interchangeable. Check rather than assume the later letter supersedes.</p>
+    </div>
+  </section>
+
+  <section id="listing">
+    <h2>House listing format</h2>
+    <div class="spec">
+      <dl>
+        <dt>Title</dt>
+        <dd>Brand + models + year range + component + part number</dd>
+        <dt>Example</dt>
+        <dd>Audi A6 S6 RS6 2005-2011 front lower wishbone (left) 4F0407151A</dd>
+        <dt>SKU</dt>
+        <dd>The part number exactly, colour suffix included</dd>
+        <dt>Vendor</dt>
+        <dd>Partshaus Ltd</dd>
+        <dt>Tags</dt>
+        <dd>_Golf _Tiguan _A6 &mdash; underscore prefixed model names, one per fitted model</dd>
+        <dt>_NOPIC</dt>
+        <dd>Tag meaning no photograph yet. A work queue, not a permanent state</dd>
+        <dt>Variants</dt>
+        <dd>One per product. One part number, one product</dd>
+      </dl>
+    </div>
+    <p class="note">List every model the part fits in the title, not just the one the type code came from. That title is what search engines match when somebody googles a bare part number, which is where most of the traffic comes from.</p>
+  </section>
+
+  <footer>
+    Compiled for the Partshaus parts desk. Subgroup and type code tables are a working reference, not the catalogue. When it matters, put the VIN in ETKA.
+  </footer>
+</div>
+
+<script>
+(function(){
+  var q = document.getElementById('q');
+  var clear = document.getElementById('clear');
+  var count = document.getElementById('count');
+  var empty = document.getElementById('empty');
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section'));
+  var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr[data-s]'));
+
+  rows.forEach(function(r){
+    r.dataset.hay = (r.dataset.s + ' ' + r.textContent).toLowerCase().replace(/\s+/g,' ');
+  });
+
+  function run(){
+    var term = q.value.trim().toLowerCase();
+    if(!term){
+      rows.forEach(function(r){ r.classList.remove('is-hidden'); });
+      sections.forEach(function(s){ s.classList.remove('is-hidden'); });
+      empty.classList.remove('is-shown');
+      empty.style.display = 'none';
+      count.textContent = '';
+      return;
+    }
+    var hits = 0;
+    rows.forEach(function(r){
+      var on = r.dataset.hay.indexOf(term) !== -1;
+      r.classList.toggle('is-hidden', !on);
+      if(on) hits++;
+    });
+    sections.forEach(function(s){
+      var tr = s.querySelectorAll('tbody tr[data-s]');
+      if(!tr.length){ s.classList.add('is-hidden'); return; }
+      var any = Array.prototype.some.call(tr, function(r){ return !r.classList.contains('is-hidden'); });
+      s.classList.toggle('is-hidden', !any);
+    });
+    empty.style.display = hits ? 'none' : 'block';
+    count.textContent = hits + (hits === 1 ? ' match' : ' matches');
+  }
+
+  q.addEventListener('input', run);
+  clear.addEventListener('click', function(){ q.value = ''; run(); q.focus(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === '/' && document.activeElement !== q){ e.preventDefault(); q.focus(); q.select(); }
+    if(e.key === 'Escape' && document.activeElement === q){ q.value=''; run(); }
+  });
+})();
+</script>
+
+</body>
+</html>
